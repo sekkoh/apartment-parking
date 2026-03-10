@@ -1,0 +1,35 @@
+{
+  "manifest_version": 3,
+  "name": "駐車場代表示",
+  "version": "2.0.0",
+  "description": "賃貸一覧画面上で駐車場代を表示します（Suumo・エイブル対応）",
+  "permissions": [],
+  "host_permissions": [
+    "https://suumo.jp/*",
+    "https://www.able.co.jp/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://suumo.jp/chintai/*",
+        "https://suumo.jp/j/chintai/*",
+        "https://suumo.jp/jj/chintai/*",
+        "https://www.able.co.jp/*/ensen/*/list/*",
+        "https://www.able.co.jp/*/area/*/list/*",
+        "https://www.able.co.jp/list/*",
+        "https://www.able.co.jp/feature/parking/*"
+      ],
+      "js": [
+        "content/config.js",
+        "content/utils.js",
+        "content/core.js",
+        "content/adapter-registry.js",
+        "content/adapters/suumo.js",
+        "content/adapters/able.js",
+        "content/main.js"
+      ],
+      "css": ["content.css"],
+      "run_at": "document_idle"
+    }
+  ]
+}
