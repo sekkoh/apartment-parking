@@ -2,6 +2,9 @@
 
 賃貸一覧画面上で駐車場代を表示する Chrome 拡張機能。Suumo・エイブル対応。
 
+<img width="1340" height="931" alt="スクリーンショット 2026-03-30 23 49 22" src="https://github.com/user-attachments/assets/257b1b0d-804a-4e9a-86d7-29532cfca13a" />
+
+
 ## インストール
 
 ### crxファイルより
