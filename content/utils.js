@@ -21,7 +21,13 @@
    * 例: "2万円" → 20000, "近隣100m" → null（距離表記は除外）
    */
   function parseParkingToNumber(str) {
-    if (!str || str === '取得中...' || str === '取得失敗') return null;
+    if (
+      !str ||
+      str === '取得待ち' ||
+      str === '取得中...' ||
+      str === '取得失敗'
+    )
+      return null;
     const s = String(str).trim();
     if (s === '-' || s === 'なし' || s === '—' || s === '要問合せ') return null;
     if (s === '無料' || s === '0円') return 0;

@@ -16,6 +16,13 @@
   let fetchTotal = 0;
   let fetchDone = 0;
 
+  function isParkingCacheHit(adapter, detailUrl) {
+    return (
+      typeof adapter.isParkingCached === 'function' &&
+      adapter.isParkingCached(detailUrl)
+    );
+  }
+
   function bumpProgressAndFilter(adapter) {
     fetchDone += 1;
     core.setFetchProgress(fetchDone, fetchTotal);
@@ -40,10 +47,18 @@
     let delay = 0;
     entries.forEach(({ row, url }) => {
       row.setAttribute(queuedAttr, '1');
+      const hit = isParkingCacheHit(adapter, url);
+      const scheduleAt = hit ? 0 : delay;
+      if (!hit) delay += DELAY_MS;
+      if (
+        scheduleAt > 0 &&
+        typeof adapter.showParkingPendingRow === 'function'
+      ) {
+        adapter.showParkingPendingRow(row);
+      }
       setTimeout(() => {
         adapter.processRoomRow(row, url, () => bumpProgressAndFilter(adapter));
-      }, delay);
-      delay += DELAY_MS;
+      }, scheduleAt);
     });
   }
 
@@ -55,12 +70,24 @@
     if (!adapter) return;
 
     adapter.init();
+    let delay = 0;
     adapter.getRoomEntries().forEach(({ row, url }) => {
       if (!row.getAttribute(processedAttr) && !row.getAttribute(queuedAttr)) {
         row.setAttribute(queuedAttr, '1');
         fetchTotal += 1;
         core.setFetchProgress(fetchDone, fetchTotal);
-        adapter.processRoomRow(row, url, () => bumpProgressAndFilter(adapter));
+        const hit = isParkingCacheHit(adapter, url);
+        const scheduleAt = hit ? 0 : delay;
+        if (!hit) delay += DELAY_MS;
+        if (
+          scheduleAt > 0 &&
+          typeof adapter.showParkingPendingRow === 'function'
+        ) {
+          adapter.showParkingPendingRow(row);
+        }
+        setTimeout(() => {
+          adapter.processRoomRow(row, url, () => bumpProgressAndFilter(adapter));
+        }, scheduleAt);
       }
     });
   }

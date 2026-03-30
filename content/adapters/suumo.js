@@ -7,36 +7,31 @@
   const config = ParkingExt.config || {};
   const utils = ParkingExt.utils || {};
   const registry = ParkingExt.adapterRegistry || {};
+  const parkingCache = ParkingExt.parkingCache || {};
 
   const CACHE_KEY = (config.CACHE_KEY_PREFIX || 'parking-ext-cache-') + 'suumo';
-  const CACHE_EXPIRE_DAYS = config.CACHE_EXPIRE_DAYS || 7;
   const feeClass = config.PARKING_FEE_CLASS || 'parking-ext-fee';
   const processedAttr = config.PROCESSED_ATTR || 'data-parking-ext-processed';
   const numAttr = config.PARKING_NUM_ATTR || 'data-parking-ext-num';
 
+  function getCacheKeyForDetailUrl(detailUrl) {
+    const match = detailUrl.match(/jnc_(\d+)/);
+    return match ? match[1] : null;
+  }
+
   /** localStorage から駐車場代のキャッシュを取得する（有効期限内のみ） */
   function getCachedParking(jncId) {
-    try {
-      const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
-      const item = cache[jncId];
-      if (
-        item &&
-        Date.now() - item.timestamp <
-          CACHE_EXPIRE_DAYS * 24 * 60 * 60 * 1000
-      ) {
-        return item.value;
-      }
-    } catch (_) {}
-    return null;
+    return parkingCache.getValid(CACHE_KEY, jncId);
   }
 
   /** 駐車場代を localStorage にキャッシュする */
   function setCachedParking(jncId, value) {
-    try {
-      const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
-      cache[jncId] = { value, timestamp: Date.now() };
-      localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-    } catch (_) {}
+    parkingCache.set(CACHE_KEY, jncId, value);
+  }
+
+  function isParkingCached(detailUrl) {
+    const id = getCacheKeyForDetailUrl(detailUrl);
+    return id != null && parkingCache.getValid(CACHE_KEY, id) !== null;
   }
 
   /** 米印（※）以下の注釈文言を削除する（一覧表示用） */
@@ -70,8 +65,7 @@
 
   /** 物件詳細ページを fetch し、駐車場代を取得する（キャッシュがあればそれを返す） */
   function fetchParkingFee(detailUrl) {
-    const match = detailUrl.match(/jnc_(\d+)/);
-    const jncId = match ? match[1] : null;
+    const jncId = getCacheKeyForDetailUrl(detailUrl);
     if (!jncId) return Promise.resolve(null);
 
     const cached = getCachedParking(jncId);
@@ -180,6 +174,25 @@
       return entries;
     },
 
+    /**
+     * 取得キュー待ちの行に「取得待ち」を先に出す（main から遅延ありのときのみ）
+     * processedAttr は付けない（processRoomRow で取得開始時に付与）
+     */
+    showParkingPendingRow(row) {
+      if (row.getAttribute(processedAttr)) return;
+      const rentCell = getRentCell(row);
+      if (!rentCell) return;
+      if (rentCell.querySelector(`.${feeClass}`)) return;
+      const span = document.createElement('span');
+      span.className = feeClass;
+      span.textContent = '取得待ち';
+      span.title = '駐車場代（詳細ページから取得）';
+      const wrapper = document.createElement('div');
+      wrapper.className = config.PARKING_WRAPPER_CLASS || 'parking-ext-in-rent';
+      wrapper.appendChild(span);
+      rentCell.appendChild(wrapper);
+    },
+
     /** 部屋行に駐車場代を取得・表示し、取得完了時に onParkingFetched を呼ぶ */
     processRoomRow(row, detailUrl, onParkingFetched) {
       if (row.getAttribute(processedAttr)) return;
@@ -189,9 +202,29 @@
         onParkingFetched();
         return;
       }
-      if (rentCell.querySelector(`.${feeClass}`)) {
+      const existingFee = rentCell.querySelector(`.${feeClass}`);
+      if (existingFee) {
+        if (existingFee.textContent !== '取得待ち') {
+          row.setAttribute(processedAttr, '1');
+          onParkingFetched();
+          return;
+        }
+        existingFee.textContent = '取得中...';
         row.setAttribute(processedAttr, '1');
-        onParkingFetched();
+        fetchParkingFee(detailUrl).then((parking) => {
+          existingFee.textContent = parking !== null ? parking : '取得失敗';
+          const num =
+            (suumoAdapter.parseParkingToNumber || utils.parseParkingToNumber)(
+              existingFee.textContent
+            );
+          existingFee.setAttribute(numAttr, num !== null ? String(num) : '');
+          row.setAttribute(numAttr, existingFee.getAttribute(numAttr));
+          existingFee.title =
+            num !== null
+              ? `駐車場代: ${existingFee.textContent} (比較用: ${num}円)`
+              : '駐車場代: 不明';
+          onParkingFetched();
+        });
         return;
       }
 
@@ -223,6 +256,8 @@
 
     getRowAndItem,
     getRentCell,
+    getCacheKeyForDetailUrl,
+    isParkingCached,
     parseParkingToNumber: utils.parseParkingToNumber,
   };
 
