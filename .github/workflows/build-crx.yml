@@ -1,0 +1,63 @@
+name: Build CRX
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Stage extension files
+        run: |
+          set -euo pipefail
+          mkdir -p build/stage
+          rsync -a manifest.json content.css content build/stage/
+
+      - name: Build zip and signed crx
+        env:
+          CHROME_CRX_PRIVATE_KEY: ${{ secrets.CHROME_CRX_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+          umask 077
+          printf '%s\n' "$CHROME_CRX_PRIVATE_KEY" > build/key.pem
+          npx --yes crx3@2.0.0 \
+            -p build/key.pem \
+            -o build/extension.crx \
+            -z build/extension.zip \
+            build/stage
+          rm -f build/key.pem
+
+      - name: Upload crx artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: extension-crx
+          path: build/extension.crx
+
+      - name: Create GitHub Release with crx
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="${{ github.ref_name }}"
+          REPO="${{ github.repository }}"
+          if gh release view "$TAG" --repo "$REPO" &>/dev/null; then
+            gh release upload "$TAG" build/extension.crx --clobber --repo "$REPO"
+          else
+            gh release create "$TAG" build/extension.crx \
+              --generate-notes \
+              --verify-tag \
+              --repo "$REPO"
+          fi
