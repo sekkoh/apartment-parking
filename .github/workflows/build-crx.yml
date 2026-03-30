@@ -2,30 +2,73 @@ name: Build CRX
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
   contents: write
+
+concurrency:
+  group: release-extension
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v6
         with:
           node-version: "24"
 
+      - name: Resolve version and decide whether to release
+        id: meta
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "JSON.parse(require('fs').readFileSync('manifest.json','utf8')).version")
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "Invalid manifest version: $VERSION (expected semver like 1.2.3)"
+            exit 1
+          fi
+          TAG="v${VERSION}"
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          REPO="${{ github.repository }}"
+          if gh release view "$TAG" --repo "$REPO" &>/dev/null; then
+            echo "Release ${TAG} already exists — skipping build and upload."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          git fetch origin "refs/tags/${TAG}:refs/tags/${TAG}" 2>/dev/null || true
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            if [ "$(git rev-parse "$TAG"^{})" != "$(git rev-parse HEAD)" ]; then
+              echo "Tag ${TAG} already exists on another commit. Bump manifest.json version or delete the conflicting tag."
+              exit 1
+            fi
+            echo "Tag ${TAG} points at this commit; will create release only."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" -m "Release ${TAG}"
+            git push origin "$TAG"
+          fi
+          echo "skip=false" >> "$GITHUB_OUTPUT"
+
       - name: Stage extension files
+        if: steps.meta.outputs.skip != 'true'
         run: |
           set -euo pipefail
           mkdir -p build/stage
           rsync -a manifest.json content.css content build/stage/
 
       - name: Build zip and signed crx
+        if: steps.meta.outputs.skip != 'true'
         env:
           CHROME_CRX_PRIVATE_KEY: ${{ secrets.CHROME_CRX_PRIVATE_KEY }}
         run: |
@@ -40,24 +83,21 @@ jobs:
           rm -f build/key.pem
 
       - name: Upload crx artifact
+        if: steps.meta.outputs.skip != 'true'
         uses: actions/upload-artifact@v7
         with:
           name: extension-crx
           path: build/extension.crx
 
       - name: Create GitHub Release with crx
-        if: startsWith(github.ref, 'refs/tags/')
+        if: steps.meta.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
-          TAG="${{ github.ref_name }}"
+          TAG="${{ steps.meta.outputs.tag }}"
           REPO="${{ github.repository }}"
-          if gh release view "$TAG" --repo "$REPO" &>/dev/null; then
-            gh release upload "$TAG" build/extension.crx --clobber --repo "$REPO"
-          else
-            gh release create "$TAG" build/extension.crx \
-              --generate-notes \
-              --verify-tag \
-              --repo "$REPO"
-          fi
+          gh release create "$TAG" build/extension.crx \
+            --generate-notes \
+            --verify-tag \
+            --repo "$REPO"
