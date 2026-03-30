@@ -1,0 +1,46 @@
+name: Build CRX
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Pack extension directory to zip
+        id: pack
+        uses: cardinalby/webext-buildtools-pack-extension-dir-action@v1
+        with:
+          extensionDir: "."
+          zipFilePath: build/extension.zip
+          zipIgnore: "*.pem|.git|*.crx|README.md|.gitignore|.github/**"
+
+      - name: Sign zip to crx
+        id: chrome-crx
+        uses: cardinalby/webext-buildtools-chrome-crx-action@v2
+        with:
+          zipFilePath: build/extension.zip
+          crxFilePath: build/extension.crx
+          privateKey: ${{ secrets.CHROME_CRX_PRIVATE_KEY }}
+
+      - name: Upload crx artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: extension-crx
+          path: build/extension.crx
+
+      - name: Create GitHub Release with crx
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: build/extension.crx
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
