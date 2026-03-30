@@ -209,9 +209,14 @@
       const rentCell = getRentCell(row);
       if (!rentCell || !hasRentData(rentCell)) {
         row.setAttribute(processedAttr, '1');
+        onParkingFetched();
         return;
       }
-      if (rentCell.querySelector(`.${feeClass}`)) return;
+      if (rentCell.querySelector(`.${feeClass}`)) {
+        row.setAttribute(processedAttr, '1');
+        onParkingFetched();
+        return;
+      }
 
       const span = document.createElement('span');
       span.className = feeClass;
