@@ -1,0 +1,45 @@
+name: PR checks
+
+on:
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Validate manifest.json
+        run: node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"
+
+      - name: Verify manifest file references
+        run: |
+          node <<'NODE'
+          const fs = require("fs");
+          const m = JSON.parse(fs.readFileSync("manifest.json", "utf8"));
+          for (const cs of m.content_scripts || []) {
+            for (const p of cs.js || []) {
+              if (!fs.existsSync(p)) throw new Error("Missing file listed in manifest: " + p);
+            }
+            for (const p of cs.css || []) {
+              if (!fs.existsSync(p)) throw new Error("Missing file listed in manifest: " + p);
+            }
+          }
+          NODE
+
+      - name: Check JavaScript syntax
+        run: |
+          set -euo pipefail
+          git ls-files "*.js" | while IFS= read -r f; do
+            echo "Checking $f"
+            node --check "$f"
+          done
