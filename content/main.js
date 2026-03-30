@@ -50,6 +50,12 @@
       const hit = isParkingCacheHit(adapter, url);
       const scheduleAt = hit ? 0 : delay;
       if (!hit) delay += DELAY_MS;
+      if (
+        scheduleAt > 0 &&
+        typeof adapter.showParkingPendingRow === 'function'
+      ) {
+        adapter.showParkingPendingRow(row);
+      }
       setTimeout(() => {
         adapter.processRoomRow(row, url, () => bumpProgressAndFilter(adapter));
       }, scheduleAt);
@@ -73,6 +79,12 @@
         const hit = isParkingCacheHit(adapter, url);
         const scheduleAt = hit ? 0 : delay;
         if (!hit) delay += DELAY_MS;
+        if (
+          scheduleAt > 0 &&
+          typeof adapter.showParkingPendingRow === 'function'
+        ) {
+          adapter.showParkingPendingRow(row);
+        }
         setTimeout(() => {
           adapter.processRoomRow(row, url, () => bumpProgressAndFilter(adapter));
         }, scheduleAt);
