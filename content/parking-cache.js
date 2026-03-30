@@ -13,7 +13,7 @@
   }
 
   function getMaxEntries() {
-    return config.CACHE_MAX_ENTRIES != null ? config.CACHE_MAX_ENTRIES : 400;
+    return config.CACHE_MAX_ENTRIES != null ? config.CACHE_MAX_ENTRIES : 1000;
   }
 
   function readCache(storageKey) {
