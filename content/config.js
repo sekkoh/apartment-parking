@@ -9,9 +9,11 @@
     CACHE_EXPIRE_DAYS: 7, // 駐車場代キャッシュの有効期限（日）
     CACHE_KEY_PREFIX: 'parking-ext-cache-', // キャッシュの localStorage キー接頭辞
     FILTER_STATE_KEY: 'parking-ext-filter-state', // フィルター設定の localStorage キー
+    PANEL_VIEW_KEY: 'parking-ext-panel-view', // 'expanded' | 'compact' | 'minimal'
     PARKING_FEE_CLASS: 'parking-ext-fee', // 駐車場代表示用 span のクラス名
     PARKING_WRAPPER_CLASS: 'parking-ext-in-rent', // 賃料セル内のラッパー div のクラス名
     PROCESSED_ATTR: 'data-parking-ext-processed', // 処理済み行を示す data 属性
+    QUEUE_ATTR: 'data-parking-ext-queued', // run() でスケジュール済み（observer と二重にしない）
     PARKING_NUM_ATTR: 'data-parking-ext-num', // パース済み駐車場代（数値）を格納する data 属性
   };
 })(typeof window !== 'undefined' ? window : this);

@@ -11,6 +11,16 @@
 
   const DELAY_MS = config.DELAY_MS || 500;
   const processedAttr = config.PROCESSED_ATTR || 'data-parking-ext-processed';
+  const queuedAttr = config.QUEUE_ATTR || 'data-parking-ext-queued';
+
+  let fetchTotal = 0;
+  let fetchDone = 0;
+
+  function bumpProgressAndFilter(adapter) {
+    fetchDone += 1;
+    core.setFetchProgress(fetchDone, fetchTotal);
+    core.applyFilter(adapter);
+  }
 
   /**
    * メイン処理。URL に合うアダプターを取得し、初期化・フィルターUI作成・各部屋の駐車場代取得を実行する
@@ -23,10 +33,15 @@
     core.createFilterUI(adapter, () => core.applyFilter(adapter));
 
     const entries = adapter.getRoomEntries();
+    fetchTotal = entries.length;
+    fetchDone = 0;
+    core.setFetchProgress(fetchDone, fetchTotal);
+
     let delay = 0;
     entries.forEach(({ row, url }) => {
+      row.setAttribute(queuedAttr, '1');
       setTimeout(() => {
-        adapter.processRoomRow(row, url, () => core.applyFilter(adapter));
+        adapter.processRoomRow(row, url, () => bumpProgressAndFilter(adapter));
       }, delay);
       delay += DELAY_MS;
     });
@@ -41,8 +56,11 @@
 
     adapter.init();
     adapter.getRoomEntries().forEach(({ row, url }) => {
-      if (!row.getAttribute(processedAttr)) {
-        adapter.processRoomRow(row, url, () => core.applyFilter(adapter));
+      if (!row.getAttribute(processedAttr) && !row.getAttribute(queuedAttr)) {
+        row.setAttribute(queuedAttr, '1');
+        fetchTotal += 1;
+        core.setFetchProgress(fetchDone, fetchTotal);
+        adapter.processRoomRow(row, url, () => bumpProgressAndFilter(adapter));
       }
     });
   }

@@ -15,6 +15,92 @@
     mode: 'highlight', // 'highlight': 強調表示, 'filter': 絞り込み表示
   };
 
+  /** @type {'expanded'|'compact'|'minimal'} */
+  let panelView = 'expanded';
+
+  let progressDone = 0;
+  let progressTotal = 0;
+
+  function loadPanelView() {
+    try {
+      const raw = localStorage.getItem(
+        config.PANEL_VIEW_KEY || 'parking-ext-panel-view'
+      );
+      if (raw === 'compact' || raw === 'minimal' || raw === 'expanded') {
+        panelView = raw;
+      }
+    } catch (_) {}
+  }
+
+  function savePanelView() {
+    try {
+      localStorage.setItem(
+        config.PANEL_VIEW_KEY || 'parking-ext-panel-view',
+        panelView
+      );
+    } catch (_) {}
+  }
+
+  /** 進捗表示を更新する（done / total は main から渡す） */
+  function setFetchProgress(done, total) {
+    progressDone = Math.max(0, done);
+    progressTotal = Math.max(0, total);
+
+    const labelEl = document.getElementById('parking-ext-progress-label');
+    const barEl = document.getElementById('parking-ext-progress-bar');
+    const compactProg = document.getElementById('parking-ext-compact-progress');
+
+    const pct =
+      progressTotal > 0
+        ? Math.min(100, (progressDone / progressTotal) * 100)
+        : 0;
+    let text = '駐車場代を取得: —';
+    if (progressTotal > 0) {
+      text = `駐車場代を取得: ${progressDone} / ${progressTotal}${
+        progressDone >= progressTotal ? '（完了）' : ''
+      }`;
+    }
+
+    if (labelEl) labelEl.textContent = text;
+    if (barEl) barEl.style.width = `${pct}%`;
+    if (compactProg) {
+      compactProg.textContent =
+        progressTotal > 0 ? `${progressDone}/${progressTotal}` : '—';
+    }
+  }
+
+  /** パネル表示モードを切り替え、DOM と localStorage を反映する */
+  function applyPanelView() {
+    const panel = document.getElementById('parking-ext-filter-panel');
+    if (!panel) return;
+
+    panel.classList.remove(
+      'parking-ext-view-expanded',
+      'parking-ext-view-compact',
+      'parking-ext-view-minimal'
+    );
+    panel.classList.add(`parking-ext-view-${panelView}`);
+
+    const headerFull = document.getElementById('parking-ext-header-full');
+    const headerCompact = document.getElementById('parking-ext-header-compact');
+    const body = document.getElementById('parking-ext-panel-body');
+    const minimalWrap = document.getElementById('parking-ext-panel-minimal');
+
+    if (headerFull) headerFull.hidden = panelView !== 'expanded';
+    if (headerCompact) headerCompact.hidden = panelView !== 'compact';
+    if (body) body.hidden = panelView !== 'expanded';
+    if (minimalWrap) minimalWrap.hidden = panelView !== 'minimal';
+
+    savePanelView();
+    setFetchProgress(progressDone, progressTotal);
+  }
+
+  function setPanelView(view) {
+    if (view !== 'expanded' && view !== 'compact' && view !== 'minimal') return;
+    panelView = view;
+    applyPanelView();
+  }
+
   /** フィルター設定を localStorage に保存する（リロード後も復元） */
   function saveFilterState() {
     try {
@@ -126,32 +212,76 @@
   function createFilterUI(adapter, onApply) {
     if (document.getElementById('parking-ext-filter-panel')) return;
 
+    loadPanelView();
+
     const panel = document.createElement('div');
     panel.id = 'parking-ext-filter-panel';
     panel.className = 'parking-ext-filter-panel';
     panel.innerHTML = `
-      <div class="parking-ext-filter-title">駐車場代で絞り込み</div>
-      <div class="parking-ext-filter-row">
-        <input type="number" id="parking-ext-min" placeholder="下限(円)" min="0" step="1000">
-        <span>〜</span>
-        <input type="number" id="parking-ext-max" placeholder="上限(円)" min="0" step="1000">
+      <div class="parking-ext-header-full" id="parking-ext-header-full">
+        <div class="parking-ext-panel-title-row">
+          <span class="parking-ext-filter-title">駐車場代で絞り込み</span>
+          <div class="parking-ext-panel-header-btns">
+            <button type="button" class="parking-ext-panel-icon-btn" id="parking-ext-btn-to-compact" title="コンパクト表示" aria-label="コンパクト表示">▁</button>
+            <button type="button" class="parking-ext-panel-icon-btn" id="parking-ext-btn-to-minimal-from-expanded" title="最小化" aria-label="最小化">◎</button>
+          </div>
+        </div>
       </div>
-      <div id="parking-ext-range-display" class="parking-ext-range-display"></div>
-      <div class="parking-ext-filter-row parking-ext-mode-row">
-        <span class="parking-ext-mode-label">表示モード:</span>
-        <label class="parking-ext-mode-option" data-mode="highlight">
-          <input type="radio" name="parking-ext-mode" value="highlight" checked>
-          <span>強調表示</span>
-        </label>
-        <label class="parking-ext-mode-option" data-mode="filter">
-          <input type="radio" name="parking-ext-mode" value="filter">
-          <span>絞り込み表示</span>
-        </label>
+      <div class="parking-ext-header-compact" id="parking-ext-header-compact" hidden>
+        <span class="parking-ext-compact-title">駐車場フィルター</span>
+        <span id="parking-ext-compact-progress" class="parking-ext-compact-progress">—</span>
+        <button type="button" class="parking-ext-panel-icon-btn" id="parking-ext-btn-to-expanded" title="展開" aria-label="展開">＋</button>
+        <button type="button" class="parking-ext-panel-icon-btn" id="parking-ext-btn-to-minimal-from-compact" title="最小化" aria-label="最小化">◎</button>
       </div>
-      <div id="parking-ext-mode-status" class="parking-ext-mode-status">現在: 強調表示</div>
+      <div class="parking-ext-panel-minimal" id="parking-ext-panel-minimal" hidden>
+        <button type="button" class="parking-ext-minimal-fab" id="parking-ext-minimal-fab" title="駐車場フィルターを表示" aria-label="コンパクト表示">▲</button>
+      </div>
+      <div class="parking-ext-panel-body" id="parking-ext-panel-body">
+        <div id="parking-ext-progress-row" class="parking-ext-progress-row">
+          <div id="parking-ext-progress-label" class="parking-ext-progress-label"></div>
+          <div class="parking-ext-progress-bar-wrap">
+            <div id="parking-ext-progress-bar" class="parking-ext-progress-bar"></div>
+          </div>
+        </div>
+        <div class="parking-ext-filter-row">
+          <input type="number" id="parking-ext-min" placeholder="下限(円)" min="0" step="1000">
+          <span>〜</span>
+          <input type="number" id="parking-ext-max" placeholder="上限(円)" min="0" step="1000">
+        </div>
+        <div id="parking-ext-range-display" class="parking-ext-range-display"></div>
+        <div class="parking-ext-filter-row parking-ext-mode-row">
+          <span class="parking-ext-mode-label">表示モード:</span>
+          <label class="parking-ext-mode-option" data-mode="highlight">
+            <input type="radio" name="parking-ext-mode" value="highlight" checked>
+            <span>強調表示</span>
+          </label>
+          <label class="parking-ext-mode-option" data-mode="filter">
+            <input type="radio" name="parking-ext-mode" value="filter">
+            <span>絞り込み表示</span>
+          </label>
+        </div>
+        <div id="parking-ext-mode-status" class="parking-ext-mode-status">現在: 強調表示</div>
+      </div>
     `;
 
     document.body.appendChild(panel);
+
+    function wireBtn(id, fn) {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener('click', fn);
+    }
+    wireBtn('parking-ext-btn-to-compact', () => setPanelView('compact'));
+    wireBtn('parking-ext-btn-to-minimal-from-expanded', () =>
+      setPanelView('minimal')
+    );
+    wireBtn('parking-ext-btn-to-expanded', () => setPanelView('expanded'));
+    wireBtn('parking-ext-btn-to-minimal-from-compact', () =>
+      setPanelView('minimal')
+    );
+    wireBtn('parking-ext-minimal-fab', () => setPanelView('compact'));
+
+    applyPanelView();
+    setFetchProgress(progressDone, progressTotal);
 
     const minInput = document.getElementById('parking-ext-min');
     const maxInput = document.getElementById('parking-ext-max');
@@ -168,7 +298,7 @@
     /** 選択中のモードに応じてラベルとステータス表示を更新する */
     function updateModeVisual() {
       const checked = document.querySelector('input[name="parking-ext-mode"]:checked');
-      const mode = checked?.value || 'highlight';
+      const mode = (checked && checked.value) || 'highlight';
       document.querySelectorAll('.parking-ext-mode-option').forEach((label) => {
         label.classList.toggle('parking-ext-mode-selected', label.dataset.mode === mode);
       });
@@ -183,9 +313,11 @@
       const maxVal = maxInput.value.trim();
       filterState.min = minVal || null;
       filterState.max = maxVal || null;
+      const modeRadioChecked = document.querySelector(
+        'input[name="parking-ext-mode"]:checked'
+      );
       filterState.mode =
-        document.querySelector('input[name="parking-ext-mode"]:checked')
-          ?.value || 'highlight';
+        (modeRadioChecked && modeRadioChecked.value) || 'highlight';
       const rangeEl = document.getElementById('parking-ext-range-display');
       if (rangeEl && (filterState.min || filterState.max)) {
         const min = filterState.min ? parseInt(filterState.min, 10) : 0;
@@ -218,5 +350,7 @@
     loadFilterState,
     applyFilter,
     createFilterUI,
+    setFetchProgress,
+    setPanelView,
   };
 })(typeof window !== 'undefined' ? window : this);

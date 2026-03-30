@@ -13,7 +13,7 @@
 .parking-ext-filter-panel {
   position: fixed;
   top: 80px;
-  right: 16px;
+  right: max(16px, env(safe-area-inset-right, 0px));
   z-index: 9999;
   background: #fff;
   border: 1px solid #ccc;
@@ -21,11 +21,141 @@
   padding: 12px 16px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
   font-size: 14px;
+  max-width: min(360px, calc(100vw - 32px));
+  box-sizing: border-box;
+}
+
+.parking-ext-filter-panel.parking-ext-view-compact {
+  padding: 8px 10px;
+  max-width: min(280px, calc(100vw - 24px));
+}
+
+.parking-ext-filter-panel.parking-ext-view-minimal {
+  top: auto;
+  bottom: max(16px, env(safe-area-inset-bottom, 0px));
+  right: max(16px, env(safe-area-inset-right, 0px));
+  left: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+  max-width: none;
+}
+
+/* [hidden] より class の display が勝つため、非表示を確実にする */
+#parking-ext-header-full[hidden],
+#parking-ext-header-compact[hidden],
+#parking-ext-panel-body[hidden],
+#parking-ext-panel-minimal[hidden] {
+  display: none !important;
+}
+
+.parking-ext-panel-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
 }
 
 .parking-ext-filter-title {
   font-weight: bold;
-  margin-bottom: 8px;
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.parking-ext-panel-header-btns {
+  display: flex;
+  flex-shrink: 0;
+  gap: 4px;
+}
+
+.parking-ext-panel-icon-btn {
+  box-sizing: border-box;
+  min-width: 36px;
+  min-height: 36px;
+  padding: 4px 8px;
+  font-size: 14px;
+  line-height: 1;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  background: #f5f5f5;
+  cursor: pointer;
+}
+
+.parking-ext-panel-icon-btn:hover {
+  background: #eee;
+}
+
+.parking-ext-header-compact {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 0;
+}
+
+.parking-ext-panel-minimal {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.parking-ext-minimal-fab {
+  box-sizing: border-box;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 8px 12px;
+  font-size: 16px;
+  line-height: 1;
+  border: 1px solid #0066cc;
+  border-radius: 999px;
+  background: #e3f2fd;
+  color: #0066cc;
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+}
+
+.parking-ext-minimal-fab:hover {
+  background: #bbdefb;
+}
+
+.parking-ext-compact-title {
+  font-weight: bold;
+  font-size: 13px;
+}
+
+.parking-ext-compact-progress {
+  font-size: 12px;
+  color: #0066cc;
+  font-variant-numeric: tabular-nums;
+}
+
+.parking-ext-progress-row {
+  margin-bottom: 10px;
+}
+
+.parking-ext-progress-label {
+  font-size: 12px;
+  color: #444;
+  margin-bottom: 6px;
+  line-height: 1.35;
+}
+
+.parking-ext-progress-bar-wrap {
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.parking-ext-progress-bar {
+  height: 100%;
+  width: 0%;
+  background: #0066cc;
+  border-radius: 3px;
+  transition: width 0.2s ease;
 }
 
 .parking-ext-range-display {
