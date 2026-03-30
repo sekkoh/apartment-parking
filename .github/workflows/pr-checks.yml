@@ -18,6 +18,36 @@ jobs:
         with:
           node-version: "24"
 
+      - name: Check manifest version vs released tags
+        env:
+          PR_HEAD: ${{ github.event.pull_request.head.sha }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          VERSION=$(node -p "JSON.parse(require('fs').readFileSync('manifest.json','utf8')).version")
+          if ! printf '%s' "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$'; then
+            echo "Invalid manifest version: $VERSION (expected semver like 1.2.3)"
+            exit 1
+          fi
+          TAG="v${VERSION}"
+          REPO_URL="https://x-access-token:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          PEEL=$(git ls-remote "$REPO_URL" "refs/tags/${TAG}^{}" 2>/dev/null | awk '{print $1}' | head -n1)
+          if [ -z "$PEEL" ]; then
+            PEEL=$(git ls-remote "$REPO_URL" "refs/tags/${TAG}" 2>/dev/null | awk '{print $1}' | head -n1)
+          fi
+          if [ -z "$PEEL" ]; then
+            echo "No remote tag ${TAG} — this version has not been released yet."
+            exit 0
+          fi
+          TAG_SHA="$PEEL"
+          if [ "$TAG_SHA" = "$PR_HEAD" ]; then
+            echo "Remote tag ${TAG} already points at this PR head — OK."
+            exit 0
+          fi
+          echo "Version conflict: manifest version ${VERSION} matches released tag ${TAG} (commit ${TAG_SHA}), but this PR head is ${PR_HEAD}."
+          echo "Bump manifest.json to a version that is not already tagged on the default branch."
+          exit 1
+
       - name: Validate manifest.json
         run: node -e "JSON.parse(require('fs').readFileSync('manifest.json','utf8'))"
 
