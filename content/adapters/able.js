@@ -7,37 +7,32 @@
   const config = ParkingExt.config || {};
   const utils = ParkingExt.utils || {};
   const registry = ParkingExt.adapterRegistry || {};
+  const parkingCache = ParkingExt.parkingCache || {};
 
   const CACHE_KEY = (config.CACHE_KEY_PREFIX || 'parking-ext-cache-') + 'able';
-  const CACHE_EXPIRE_DAYS = config.CACHE_EXPIRE_DAYS || 7;
   const DELAY_MS = config.DELAY_MS || 500;
   const feeClass = config.PARKING_FEE_CLASS || 'parking-ext-fee';
   const processedAttr = config.PROCESSED_ATTR || 'data-parking-ext-processed';
   const numAttr = config.PARKING_NUM_ATTR || 'data-parking-ext-num';
 
+  function getCacheKeyForDetailUrl(detailUrl) {
+    const match = detailUrl.match(/bk=([^&]+)/);
+    return match ? match[1] : null;
+  }
+
   /** localStorage から駐車場代のキャッシュを取得する（有効期限内のみ） */
   function getCachedParking(bk) {
-    try {
-      const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
-      const item = cache[bk];
-      if (
-        item &&
-        Date.now() - item.timestamp <
-          CACHE_EXPIRE_DAYS * 24 * 60 * 60 * 1000
-      ) {
-        return item.value;
-      }
-    } catch (_) {}
-    return null;
+    return parkingCache.getValid(CACHE_KEY, bk);
   }
 
   /** 駐車場代を localStorage にキャッシュする */
   function setCachedParking(bk, value) {
-    try {
-      const cache = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}');
-      cache[bk] = { value, timestamp: Date.now() };
-      localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
-    } catch (_) {}
+    parkingCache.set(CACHE_KEY, bk, value);
+  }
+
+  function isParkingCached(detailUrl) {
+    const id = getCacheKeyForDetailUrl(detailUrl);
+    return id != null && parkingCache.getValid(CACHE_KEY, id) !== null;
   }
 
   /** 米印（※）以下の注釈文言を削除する（一覧表示用） */
@@ -88,8 +83,7 @@
 
   /** 物件詳細ページを fetch し、駐車場代を取得する（キャッシュがあればそれを返す） */
   function fetchParkingFee(detailUrl) {
-    const match = detailUrl.match(/bk=([^&]+)/);
-    const bk = match ? match[1] : null;
+    const bk = getCacheKeyForDetailUrl(detailUrl);
     if (!bk) return Promise.resolve(null);
 
     const cached = getCachedParking(bk);
@@ -245,6 +239,8 @@
 
     getRowAndItem,
     getRentCell,
+    getCacheKeyForDetailUrl,
+    isParkingCached,
     parseParkingToNumber: utils.parseParkingToNumber,
   };
 

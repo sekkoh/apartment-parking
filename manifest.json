@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "駐車場代表示",
-  "version": "2.1.0",
+  "version": "2.1.1",
   "description": "賃貸一覧画面上で駐車場代を表示します（Suumo・エイブル対応）",
   "permissions": [],
   "host_permissions": [
@@ -22,6 +22,7 @@
       "js": [
         "content/config.js",
         "content/utils.js",
+        "content/parking-cache.js",
         "content/core.js",
         "content/adapter-registry.js",
         "content/adapters/suumo.js",
