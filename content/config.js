@@ -7,7 +7,7 @@
   global.ParkingExt.config = {
     DELAY_MS: 500, // 詳細ページ取得のリクエスト間隔（ミリ秒）
     CACHE_EXPIRE_DAYS: 7, // 将来・他用途用（駐車場代 TTL には未使用）
-    CACHE_TTL_MS: 60 * 60 * 1000, // 駐車場代キャッシュの有効期限（ミリ秒・物件ごとの timestamp）
+    CACHE_TTL_MS: 6 * 60 * 60 * 1000, // 駐車場代キャッシュの有効期限（ミリ秒・物件ごとの timestamp）
     CACHE_MAX_ENTRIES: 1000, // サイト別（suumo / able 各キー）の最大ユニーク物件数。超えたら古い timestamp から削除
     CACHE_KEY_PREFIX: 'parking-ext-cache-', // キャッシュの localStorage キー接頭辞
     FILTER_STATE_KEY: 'parking-ext-filter-state', // フィルター設定の localStorage キー
