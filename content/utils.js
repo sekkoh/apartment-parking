@@ -59,8 +59,64 @@
     return null;
   }
 
+  /**
+   * 物件詳細 HTML をストリーム読みし、parse が非 null になった時点で読み取りを打ち切る。
+   * フッターや重い末尾まで落とさず済む場合がある（gzip 転送はサーバー都合で打ち切り不可のこともある）。
+   * `<body` が現れるまでパースしない（head 内の誤検出を避ける）。
+   */
+  async function fetchHtmlWithEarlyParse(url, init, parseFn, options) {
+    const stride =
+      options && typeof options.parseStrideBytes === 'number'
+        ? options.parseStrideBytes
+        : 65536;
+    const res = await fetch(url, init);
+    if (!res.ok) return null;
+    if (!res.body || typeof res.body.getReader !== 'function') {
+      const text = await res.text();
+      return text ? parseFn(text) : null;
+    }
+    const reader = res.body.getReader();
+    const decoder = new TextDecoder('utf-8');
+    let buffer = '';
+    let nextParseAt = 0;
+    const bodyRe = /<body[\s>]/i;
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) {
+          buffer += decoder.decode();
+          break;
+        }
+        if (value) buffer += decoder.decode(value, { stream: true });
+
+        const inBody = bodyRe.test(buffer);
+        if (!inBody) continue;
+
+        const shouldTry =
+          buffer.length >= nextParseAt || buffer.length >= 524288;
+        if (!shouldTry) continue;
+
+        const parsed = parseFn(buffer);
+        if (parsed !== null) {
+          await reader.cancel().catch(function () {});
+          return parsed;
+        }
+        nextParseAt = buffer.length + stride;
+      }
+      return parseFn(buffer);
+    } catch (e) {
+      try {
+        await reader.cancel();
+      } catch (e2) {
+        /* ignore */
+      }
+      return null;
+    }
+  }
+
   ParkingExt.utils = {
     toHalfWidth,
     parseParkingToNumber,
+    fetchHtmlWithEarlyParse,
   };
 })(typeof window !== 'undefined' ? window : this);

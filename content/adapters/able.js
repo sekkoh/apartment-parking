@@ -89,14 +89,16 @@
     const cached = getCachedParking(bk);
     if (cached !== null) return Promise.resolve(cached);
 
-    return fetch(detailUrl, {
-      credentials: 'same-origin',
-      headers: { Accept: 'text/html' },
-    })
-      .then((res) => (res.ok ? res.text() : null))
-      .then((html) => {
-        if (!html) return null;
-        const parking = parseParkingFromHtml(html);
+    return utils
+      .fetchHtmlWithEarlyParse(
+        detailUrl,
+        {
+          credentials: 'same-origin',
+          headers: { Accept: 'text/html' },
+        },
+        parseParkingFromHtml
+      )
+      .then((parking) => {
         if (parking !== null) setCachedParking(bk, parking);
         return parking;
       })
